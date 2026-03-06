@@ -1,0 +1,56 @@
+# Build artifacts
+build/
+bin/
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+*.exp
+
+# Generated recompiled source (too large for git)
+src/game/recomp/gen/
+
+# Game assets (not redistributable)
+game/
+*.7z
+*.iso
+*.xiso
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln
+*.vcxproj*
+CMakeSettings.json
+CMakePresets.json
+
+# CMake build directories
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Tool outputs
+tools/output/
+tools/xbe_parser/*.json
+tools/disasm/output/
+tools/func_id/output/
+tools/recomp/output/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+.claude/
