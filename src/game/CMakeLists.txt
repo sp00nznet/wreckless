@@ -15,6 +15,7 @@ file(GLOB RECOMP_GEN_SOURCES
 # Game executable sources
 set(GAME_SOURCES
     main.c
+    recomp/recomp_stubs.c
     ${RECOMP_GEN_SOURCES}
 )
 

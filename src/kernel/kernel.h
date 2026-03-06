@@ -629,6 +629,8 @@ LONG     __stdcall xbox_KeQueryBasePriorityThread(PVOID Thread);
 NTSTATUS __stdcall xbox_KeAlertThread(PVOID Thread, KPROCESSOR_MODE AlertMode);
 NTSTATUS __stdcall xbox_NtYieldExecution(void);
 NTSTATUS __stdcall xbox_NtDuplicateObject(HANDLE SourceHandle, PHANDLE TargetHandle, ULONG Options);
+NTSTATUS __stdcall xbox_NtResumeThread(HANDLE ThreadHandle, PULONG PreviousSuspendCount);
+NTSTATUS __stdcall xbox_NtSuspendThread(HANDLE ThreadHandle, PULONG PreviousSuspendCount);
 
 /* ============================================================================
  * Synchronization (kernel_sync.c)
@@ -678,6 +680,7 @@ VOID    __stdcall xbox_KeStallExecutionProcessor(ULONG MicroSeconds);
 LARGE_INTEGER __stdcall xbox_KeQueryPerformanceCounter(void);
 LARGE_INTEGER __stdcall xbox_KeQueryPerformanceFrequency(void);
 VOID    __stdcall xbox_KeQuerySystemTime(PLARGE_INTEGER CurrentTime);
+ULONGLONG __stdcall xbox_KeQueryInterruptTime(void);
 
 NTSTATUS __stdcall xbox_KeSaveFloatingPointState(PVOID FloatingPointState);
 NTSTATUS __stdcall xbox_KeRestoreFloatingPointState(PVOID FloatingPointState);
@@ -785,9 +788,14 @@ VOID    __stdcall xbox_AvSetSavedDataAddress(ULONG Address);
 VOID    __stdcall xbox_AvSetDisplayMode(PVOID RegisterBase, ULONG Step, ULONG Mode, ULONG Format, ULONG Pitch, ULONG FrameBuffer);
 
 /* Unknown ordinals - stub */
+VOID    __stdcall xbox_Unknown_5(void);
 VOID    __stdcall xbox_Unknown_8(void);
 VOID    __stdcall xbox_Unknown_23(void);
 VOID    __stdcall xbox_Unknown_42(void);
+
+/* Debug */
+ULONG   __cdecl   xbox_DbgPrint(const char* Format, ...);
+extern BOOLEAN    xbox_KdDebuggerNotPresent;
 
 /* ============================================================================
  * Debug/Logging

@@ -122,6 +122,14 @@ VOID __stdcall xbox_KeQuerySystemTime(PLARGE_INTEGER CurrentTime)
         GetSystemTimeAsFileTime((LPFILETIME)CurrentTime);
 }
 
+/* KeQueryInterruptTime - returns monotonic time in 100ns units.
+ * On Xbox this reads from a kernel shared data page updated at each
+ * timer interrupt. We use GetTickCount64 converted to 100ns units. */
+ULONGLONG __stdcall xbox_KeQueryInterruptTime(void)
+{
+    return (ULONGLONG)GetTickCount64() * 10000ULL;
+}
+
 /* ============================================================================
  * Processor Stall
  *

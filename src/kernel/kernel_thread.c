@@ -337,8 +337,62 @@ NTSTATUS __stdcall xbox_NtDuplicateObject(
     }
 
     xbox_log(XBOX_LOG_DEBUG, XBOX_LOG_THREAD,
-        "NtDuplicateObject: source=%p → target=%p (options=0x%X)",
+        "NtDuplicateObject: source=%p -> target=%p (options=0x%X)",
         SourceHandle, *TargetHandle, Options);
+
+    return STATUS_SUCCESS;
+}
+
+/* ============================================================================
+ * NtResumeThread
+ *
+ * Resumes a previously suspended thread.
+ * Maps to Win32 ResumeThread. Returns the previous suspend count.
+ * ============================================================================ */
+
+NTSTATUS __stdcall xbox_NtResumeThread(
+    HANDLE ThreadHandle,
+    PULONG PreviousSuspendCount)
+{
+    DWORD prev = ResumeThread(ThreadHandle);
+    if (prev == (DWORD)-1) {
+        xbox_log(XBOX_LOG_ERROR, XBOX_LOG_THREAD,
+            "NtResumeThread: ResumeThread failed (error %u)", GetLastError());
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    if (PreviousSuspendCount)
+        *PreviousSuspendCount = prev;
+
+    xbox_log(XBOX_LOG_DEBUG, XBOX_LOG_THREAD,
+        "NtResumeThread: handle=%p, prev_count=%u", ThreadHandle, prev);
+
+    return STATUS_SUCCESS;
+}
+
+/* ============================================================================
+ * NtSuspendThread
+ *
+ * Suspends a thread. The thread doesn't actually stop until the suspend
+ * count transitions from 0 to 1. Maps to Win32 SuspendThread.
+ * ============================================================================ */
+
+NTSTATUS __stdcall xbox_NtSuspendThread(
+    HANDLE ThreadHandle,
+    PULONG PreviousSuspendCount)
+{
+    DWORD prev = SuspendThread(ThreadHandle);
+    if (prev == (DWORD)-1) {
+        xbox_log(XBOX_LOG_ERROR, XBOX_LOG_THREAD,
+            "NtSuspendThread: SuspendThread failed (error %u)", GetLastError());
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    if (PreviousSuspendCount)
+        *PreviousSuspendCount = prev;
+
+    xbox_log(XBOX_LOG_DEBUG, XBOX_LOG_THREAD,
+        "NtSuspendThread: handle=%p, prev_count=%u", ThreadHandle, prev);
 
     return STATUS_SUCCESS;
 }

@@ -12,15 +12,15 @@ involved at runtime.
 | Phase | Status | Details |
 |-------|--------|---------|
 | XBE Parsing | Done | 11 sections, 113 kernel imports identified |
-| Disassembly | Done | 260,797 instructions, 2,200 functions |
-| Function ID | Done | 9 CRT functions identified, 2,191 unknown |
-| Recompilation | Done | 199,270 lines of C generated across 3 source files |
-| Kernel Layer | In Progress | 113 imports mapped, bridges adapted from burnout3 |
+| Disassembly | Done | All sections, 3,405 functions identified |
+| Function ID | Done | 9 CRT functions identified, 3,396 unknown |
+| Recompilation | Done | 276,249 lines of C generated across 4 source files |
+| Kernel Layer | Done | 113 imports mapped, 6 new functions implemented |
 | Graphics (D3D8->D3D11) | Scaffolded | Compatibility layer from burnout3 baseline |
 | Audio (DS->XAudio2) | Scaffolded | Compatibility layer from burnout3 baseline |
 | Input (XPP->XInput) | Scaffolded | Compatibility layer from burnout3 baseline |
-| First Build | Not Started | Awaiting integration testing |
-| First Boot | Not Started | - |
+| First Build | Done | 3.5MB wreckless.exe (MSVC x64 Release) |
+| First Boot | Not Started | Needs XBE + game assets to test |
 
 ## XBE Analysis
 
@@ -33,8 +33,8 @@ involved at runtime.
 | Code Size | ~947 KB (.text) |
 | Total Sections | 11 |
 | Kernel Imports | 113 |
-| Functions | 2,200 |
-| Instructions | 260,797 |
+| Functions | 3,405 (all sections) |
+| Translated | 3,364 (32 failed) |
 
 ### Memory Map
 
@@ -69,8 +69,7 @@ py -3 -c "from tools.xbe_parser.xbe_parser import XBEParser; ..."
 
 # 2. Disassemble
 py -3 -m tools.disasm "game/Wreckless - The Yakuza Missions/default.xbe" \
-    --analysis-json "game/Wreckless - The Yakuza Missions/default_analysis.json" \
-    --text-only -v
+    --analysis-json "game/Wreckless - The Yakuza Missions/default_analysis.json" -v
 
 # 3. Identify functions
 py -3 -m tools.func_id "game/Wreckless - The Yakuza Missions/default.xbe" \
@@ -105,7 +104,7 @@ wreckless/
     input/      Xbox input -> XInput
     game/       Recompiled game code + entry point
       recomp/
-        gen/    Auto-generated C source (199K lines, git-ignored)
+        gen/    Auto-generated C source (276K lines, git-ignored)
   tools/        xboxrecomp pipeline (disasm, func_id, recomp)
   docs/         Technical documentation
   game/         Original game files (git-ignored)

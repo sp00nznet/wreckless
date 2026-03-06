@@ -11,6 +11,8 @@
 
 #include "kernel.h"
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 /* ============================================================================
  * Exported Data Objects
@@ -58,6 +60,36 @@ XBOX_ANSI_STRING xbox_XeImageFileName = {
  * Allocated dynamically and zeroed for normal game boot. */
 static XBOX_LAUNCH_DATA_PAGE g_launch_data_page = {0};
 XBOX_LAUNCH_DATA_PAGE* xbox_LaunchDataPage = &g_launch_data_page;
+
+/* ============================================================================
+ * Debug
+ * ============================================================================ */
+
+/* KdDebuggerNotPresent - global flag indicating no kernel debugger is attached.
+ * On a retail Xbox this is TRUE. Game code checks this to skip debug output. */
+BOOLEAN xbox_KdDebuggerNotPresent = TRUE;
+
+/* DbgPrint - kernel debug print (variadic, __cdecl).
+ * On real hardware this goes to the kernel debugger serial port.
+ * We redirect to our logging system. */
+ULONG __cdecl xbox_DbgPrint(const char* Format, ...)
+{
+    va_list args;
+    char buf[512];
+
+    va_start(args, Format);
+    vsnprintf(buf, sizeof(buf), Format, args);
+    va_end(args);
+
+    xbox_log(XBOX_LOG_DEBUG, "DBG", "%s", buf);
+    return STATUS_SUCCESS;
+}
+
+/* Unknown ordinal 5 - stub */
+VOID __stdcall xbox_Unknown_5(void)
+{
+    xbox_log(XBOX_LOG_WARN, XBOX_LOG_XBOX, "Unknown_5 called (stub)");
+}
 
 /* ============================================================================
  * Section Loading
