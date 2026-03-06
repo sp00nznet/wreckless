@@ -12,15 +12,16 @@ involved at runtime.
 | Phase | Status | Details |
 |-------|--------|---------|
 | XBE Parsing | Done | 11 sections, 113 kernel imports identified |
-| Disassembly | Done | All sections, 3,405 functions identified |
-| Function ID | Done | 9 CRT functions identified, 3,396 unknown |
-| Recompilation | Done | 276,249 lines of C generated across 4 source files |
-| Kernel Layer | Done | 113 imports mapped, 6 new functions implemented |
+| Disassembly | Done | All sections, 3,407 functions (incl. 2 manual) |
+| Function ID | Done | 9 CRT, 1 SEH prolog, 1 SEH epilog identified |
+| Recompilation | Done | 276,452 lines of C across 4 source files |
+| Kernel Layer | Done | 113/113 resolved (56 bridged, 57 stub), 6 new functions |
+| First Build | Done | 3.5MB wreckless.exe (MSVC x64 Release) |
+| First Boot | Done | Game executes ~10 kernel calls, allocates heap, then crashes |
 | Graphics (D3D8->D3D11) | Scaffolded | Compatibility layer from burnout3 baseline |
 | Audio (DS->XAudio2) | Scaffolded | Compatibility layer from burnout3 baseline |
 | Input (XPP->XInput) | Scaffolded | Compatibility layer from burnout3 baseline |
-| First Build | Done | 3.5MB wreckless.exe (MSVC x64 Release) |
-| First Boot | Not Started | Needs XBE + game assets to test |
+| Gameplay | Not Started | Debugging early init crash (null pointer in data setup) |
 
 ## XBE Analysis
 
@@ -33,8 +34,9 @@ involved at runtime.
 | Code Size | ~947 KB (.text) |
 | Total Sections | 11 |
 | Kernel Imports | 113 |
-| Functions | 3,405 (all sections) |
-| Translated | 3,364 (32 failed) |
+| Functions | 3,407 (all sections, incl. 2 manual) |
+| Translated | 3,366 (32 failed) |
+| Kernel Thunks | 113/113 resolved (56 bridged, 57 stub) |
 
 ### Memory Map
 
@@ -110,15 +112,51 @@ wreckless/
   game/         Original game files (git-ignored)
 ```
 
+## Boot Log
+
+Current boot progress (game executes through initialization before crashing):
+```
+PsCreateSystemThreadEx #1: routine=0x000E8A42 (thread entry wrapper)
+  → SEH prolog setup
+  → Game init (sub_000EB50F) called via thread context
+  → RtlInitializeCriticalSection, KeInitializeEvent
+  → NtAllocateVirtualMemory: 1MB heap allocated
+  → Crash: null pointer dereference during data structure init
+```
+
+### Kernel calls executed before crash
+| # | Ordinal | Function | Result |
+|---|---------|----------|--------|
+| 1 | 255 | PsCreateSystemThreadEx | OK - main thread created |
+| 2 | 277 | RtlInitializeCriticalSection | OK |
+| 3 | 107 | KeInitializeEvent | OK |
+| 4 | 113 | KeInitializeEvent | OK |
+| 5 | 24 | ExInitializeReadWriteLock | OK (stub) |
+| 6 | 301 | NtQuerySystemTime | OK |
+| 7-8 | 184 | NtAllocateVirtualMemory | OK - 1MB allocated |
+| 9 | 291 | RtlLeaveCriticalSection | OK |
+| 10 | 277 | RtlInitializeCriticalSection | OK |
+
 ## Technical Notes
 
 - Wreckless uses a **custom engine** (not RenderWare), making function identification
   more challenging than RenderWare-based games
 - The game has extensive use of XDK libraries (D3D, D3DX, DSOUND, WMVDEC) in separate
   PE sections, which helps isolate game-specific code
+- SEH prolog/epilog at 0x000F0954/0x000F098D (MSVC __SEH_prolog pattern)
+- Thread entry wrapper at 0x000E8A42 copies init data and calls game main via context pointer
 - Internal codename "DSTEAL" / "Double Steal" (the Japanese title)
 - Multiple regional XBE variants exist (US, UK, FR, GR, JP)
 - The JP/FR/GR variants are larger (~1.9 MB vs ~1.4 MB) suggesting additional content
+
+### New kernel functions (contributed to xboxrecomp)
+| Ordinal | Function | Description |
+|---------|----------|-------------|
+| 7 | DbgPrint | Debug printf (__cdecl, variadic) |
+| 5 | KdDebuggerNotPresent | Data export: debugger absent flag |
+| 125 | KeQueryInterruptTime | Monotonic time in 100ns units |
+| 302 | NtResumeThread | Resume suspended thread |
+| 304 | NtSuspendThread | Suspend thread |
 
 ## License
 
