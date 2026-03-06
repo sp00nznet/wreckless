@@ -22,34 +22,30 @@
 #define TEXT_RAW_OFFSET         0x00001000
 
 /* .rdata raw file offset */
-#define RDATA_RAW_OFFSET        0x0035C000
+#define RDATA_RAW_OFFSET        0x0012A000
 
 /* .data raw file offset */
-#define DATA_RAW_OFFSET         0x003A3000
+#define DATA_RAW_OFFSET         0x00131000
 
 /* Additional XBE sections to map.
- * All sections need to be at their original Xbox VAs because the RW engine's
- * memory walker processes ALL of physical RAM as data structures, including
- * code sections (the walker doesn't distinguish code from data). */
+ * All sections need to be at their original Xbox VAs because the game engine
+ * may reference data within code sections (vtables, string literals, etc.). */
 static const struct {
     const char *name;
     DWORD va;
-    DWORD size;
+    DWORD size;       /* raw_size (bytes to copy from XBE) */
     DWORD raw_offset;
 } g_extra_sections[] = {
     /* XDK library code sections (between .text and .rdata) */
-    { "XMV",     0x002CC200, 163108, 0x002BD000 },
-    { "DSOUND",  0x002F3F40,  52052, 0x002E5000 },
-    { "WMADEC",  0x00300D00, 105828, 0x002F2000 },
-    { "XONLINE", 0x0031AA80, 124764, 0x0030C000 },
-    { "XNET",    0x003391E0,  78056, 0x0032B000 },
-    { "D3D",     0x0034C2E0,  69284, 0x0033F000 },
-    { "XGRPH",   0x00360A60,   8300, 0x00350000 },
-    { "XPP",     0x00362AE0,  36052, 0x00353000 },
+    { "D3D",      0x000F8760,  58796, 0x000E9000 },
+    { "D3DX",     0x0010A080, 117832, 0x000F8000 },
+    { "XGRPH",    0x00126CE0,   8492, 0x00115000 },
+    { "DSOUND",   0x00128E20,  37956, 0x00118000 },
+    { "WMVDEC",   0x001324A0,  86828, 0x0013D000 },
+    { "XPP",      0x00147800,  30492, 0x00122000 },
     /* Data sections past .data */
-    { "DOLBY",   0x0076B940,  29036, 0x0040C000 },
-    { "XON_RD",  0x00772AC0,   5416, 0x00414000 },
-    { ".data1",  0x00774000,    176, 0x00416000 },
+    { "DOLBY",    0x001D1E20,  28036, 0x00136000 },
+    /* $$XTIMAGE: 0x001D8BC0, 10240, 0x00153000 -- title image, not needed */
 };
 #define NUM_EXTRA_SECTIONS (sizeof(g_extra_sections) / sizeof(g_extra_sections[0]))
 

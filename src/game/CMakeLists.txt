@@ -19,8 +19,8 @@ set(GAME_SOURCES
     ${RECOMP_GEN_SOURCES}
 )
 
-# Create Windows GUI application
-add_executable(wreckless WIN32 ${GAME_SOURCES})
+# Create console application (for debugging; switch to WIN32 for release)
+add_executable(wreckless ${GAME_SOURCES})
 
 # Link compatibility layers
 target_link_libraries(wreckless PRIVATE

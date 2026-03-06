@@ -225,7 +225,7 @@ class FunctionTranslator:
 
         # Ensure ebp tracked if function calls __SEH_prolog or __SEH_epilog
         # (lifter emits ebp = g_seh_ebp readback after these calls).
-        SEH_FUNCS = {0x00244784, 0x002447BF}
+        SEH_FUNCS = {0x00244784, 0x002447BF, 0x000F0954, 0x000F098D}
         if any(insn.call_target in SEH_FUNCS for insn in instructions):
             used_regs.add("ebp")
 

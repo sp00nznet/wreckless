@@ -1072,8 +1072,8 @@ class Lifter:
     # SEH prolog/epilog addresses - these functions modify ebp for their
     # caller.  After calling __SEH_prolog, the caller must read back ebp
     # from g_seh_ebp.  Before returning, __SEH_prolog writes g_seh_ebp.
-    SEH_PROLOG = 0x00244784  # __SEH_prolog
-    SEH_EPILOG = 0x002447BF  # __SEH_epilog
+    SEH_PROLOG = 0x000F0954  # __SEH_prolog (Wreckless)
+    SEH_EPILOG = 0x000F098D  # __SEH_epilog (Wreckless)
 
     def _lift_call(self, insn, ops):
         # x86 'call' pushes return address then jumps.
