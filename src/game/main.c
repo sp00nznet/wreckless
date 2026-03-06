@@ -1,0 +1,204 @@
+/**
+ * Wreckless: The Yakuza Missions - Recompiled Game Entry Point
+ *
+ * This is the Windows executable that hosts the recompiled game code.
+ * It performs the following initialization sequence:
+ *
+ * 1. Load the original XBE file from disk
+ * 2. Initialize the Xbox memory layout (map data sections to original VAs)
+ * 3. Initialize the Xbox kernel replacement layer
+ * 4. Initialize graphics (D3D8->D3D11)
+ * 5. Initialize audio (DirectSound->XAudio2)
+ * 6. Initialize input (XPP->XInput)
+ * 7. Call the game's original entry point (recompiled)
+ *
+ * XBE Details:
+ *   Title:       Wreckless: The Yakuza Missions (DSTEAL)
+ *   Title ID:    0x4156000A
+ *   Base addr:   0x00010000
+ *   Entry point: 0x000EB57E
+ *   Code size:   ~947 KB (.text)
+ *   Sections:    11 (text, D3D, D3DX, XGRPH, DSOUND, WMVDEC, XPP, rdata, data, DOLBY, XTIMAGE)
+ *   Kernel imports: 113
+ */
+
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+/* Compatibility layers */
+#include "../kernel/kernel.h"
+#include "../kernel/xbox_memory_layout.h"
+#include "../d3d/d3d8_xbox.h"
+#include "../audio/dsound_xbox.h"
+#include "../input/xinput_xbox.h"
+
+/* ── Global register state for recompiled code ─────────────── */
+
+uint32_t g_eax, g_ecx, g_edx, g_esp;  /* caller-saved */
+uint32_t g_ebx, g_esi, g_edi;         /* callee-saved */
+uint32_t g_seh_ebp;                    /* SEH frame pointer */
+ptrdiff_t g_xbox_mem_offset;           /* VA translation offset */
+
+/* ── XBE Constants ─────────────────────────────────────────── */
+
+#define WRECKLESS_ENTRY_POINT   0x000EB57E
+#define WRECKLESS_XBE_DEFAULT   "game\\Wreckless - The Yakuza Missions\\default.xbe"
+
+/* ── Forward declarations ──────────────────────────────────── */
+
+static BOOL load_xbe(const char *path, void **out_data, size_t *out_size);
+static void run_message_loop(void);
+
+/* ── VEH crash handler ─────────────────────────────────────── */
+
+static LONG CALLBACK veh_handler(PEXCEPTION_POINTERS ep)
+{
+    if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+        uintptr_t fault_addr = ep->ExceptionRecord->ExceptionInformation[1];
+
+        /* GPU register probe at 0xFD000000 range - return zero */
+        if (fault_addr >= 0xFD000000 && fault_addr < 0xFE000000) {
+            /* Skip the faulting instruction and zero the dest register */
+            /* TODO: implement mini x86-64 decoder for instruction skipping */
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        fprintf(stderr, "[CRASH] Access violation at RIP=0x%llX, fault addr=0x%llX (%s)\n",
+            (unsigned long long)ep->ContextRecord->Rip,
+            (unsigned long long)fault_addr,
+            ep->ExceptionRecord->ExceptionInformation[0] ? "write" : "read");
+    }
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/* ── WinMain ───────────────────────────────────────────────── */
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nCmdShow)
+{
+    void *xbe_data = NULL;
+    size_t xbe_size = 0;
+
+    (void)hInstance;
+    (void)hPrevInstance;
+    (void)lpCmdLine;
+    (void)nCmdShow;
+
+    /* Attach console for debug output */
+    AllocConsole();
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+
+    printf("=== Wreckless: The Yakuza Missions - Static Recompilation ===\n");
+    printf("Loading XBE...\n");
+
+    /* Install VEH handler */
+    AddVectoredExceptionHandler(1, veh_handler);
+
+    /* Step 1: Load XBE */
+    if (!load_xbe(WRECKLESS_XBE_DEFAULT, &xbe_data, &xbe_size)) {
+        MessageBoxA(NULL, "Failed to load default.xbe.\n"
+                    "Place the game files in the 'game' subdirectory.",
+                    "Wreckless Recomp", MB_ICONERROR);
+        return 1;
+    }
+    printf("XBE loaded: %zu bytes\n", xbe_size);
+
+    /* Step 2: Initialize Xbox memory layout */
+    printf("Initializing Xbox memory layout...\n");
+    if (!xbox_MemoryLayoutInit(xbe_data, xbe_size)) {
+        MessageBoxA(NULL, "Failed to initialize Xbox memory layout.\n"
+                    "The required virtual address range may be unavailable.",
+                    "Wreckless Recomp", MB_ICONERROR);
+        free(xbe_data);
+        return 1;
+    }
+
+    g_xbox_mem_offset = xbox_GetMemoryOffset();
+    printf("Xbox memory mapped. Offset: 0x%llX\n", (unsigned long long)g_xbox_mem_offset);
+
+    /* Step 3: Initialize Xbox kernel */
+    printf("Initializing Xbox kernel replacement...\n");
+    xbox_kernel_init();
+
+    /* Step 4: Initialize Xbox kernel bridge (thunk table in Xbox memory) */
+    printf("Initializing kernel bridge...\n");
+    /* TODO: Call xbox_kernel_bridge_init() once bridge is wired up */
+
+    /* Step 5: Initialize stack */
+    g_esp = XBOX_STACK_TOP;
+
+    printf("\n=== Initialization complete ===\n");
+    printf("Entry point: 0x%08X\n", WRECKLESS_ENTRY_POINT);
+    printf("ESP: 0x%08X\n", g_esp);
+    printf("\nRecompiled game code not yet generated.\n");
+    printf("Run the recompilation pipeline first:\n");
+    printf("  py -3 -m tools.disasm <xbe_path>\n");
+    printf("  py -3 -m tools.func_id <xbe_path>\n");
+    printf("  py -3 -m tools.recomp <xbe_path> --split 1000\n");
+
+    /* TODO: Once recomp output exists, call the entry point:
+     *   extern void sub_000EB57E(void);
+     *   sub_000EB57E();
+     */
+
+    /* Cleanup */
+    printf("\nPress Enter to exit...\n");
+    getchar();
+
+    xbox_kernel_shutdown();
+    xbox_MemoryLayoutShutdown();
+    free(xbe_data);
+
+    return 0;
+}
+
+/* ── XBE Loading ───────────────────────────────────────────── */
+
+static BOOL load_xbe(const char *path, void **out_data, size_t *out_size)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        fprintf(stderr, "Cannot open XBE: %s\n", path);
+        return FALSE;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (size <= 0) {
+        fclose(f);
+        return FALSE;
+    }
+
+    void *data = malloc((size_t)size);
+    if (!data) {
+        fclose(f);
+        return FALSE;
+    }
+
+    if (fread(data, 1, (size_t)size, f) != (size_t)size) {
+        free(data);
+        fclose(f);
+        return FALSE;
+    }
+
+    fclose(f);
+    *out_data = data;
+    *out_size = (size_t)size;
+    return TRUE;
+}
+
+static void run_message_loop(void)
+{
+    MSG msg;
+    while (GetMessageA(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    }
+}

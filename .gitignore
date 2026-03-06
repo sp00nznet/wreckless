@@ -13,7 +13,7 @@ bin/
 src/game/recomp/gen/
 
 # Game assets (not redistributable)
-game/
+/game/
 *.7z
 *.iso
 *.xiso
