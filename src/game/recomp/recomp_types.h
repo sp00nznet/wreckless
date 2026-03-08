@@ -34,6 +34,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 
 /* ── Memory offset ──────────────────────────────────────── */
 
@@ -225,6 +226,26 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va);
  * The caller must PUSH32 a dummy return address before this macro.
  * If not found, pop the dummy return address to keep the stack balanced.
  */
+/**
+ * Callee-saved register guard for indirect calls.
+ *
+ * In x86, ebx/esi/edi are callee-preserved: every function must restore
+ * them before returning. The recomp maps these to globals (g_ebx, g_esi,
+ * g_edi), and each translated function PUSHes them at entry and POPs at
+ * exit. However, 431 dead-code switch targets in the lifter output cause
+ * some functions to return via an early path that skips the POP32
+ * restoration. This corrupts the caller's loop iterators (e.g., the CRT
+ * _initterm loop that walks function-pointer tables with esi/edi).
+ *
+ * Fix: save/restore callee-saved registers around every indirect call.
+ * This is always correct per the x86 ABI and protects against any
+ * callee that fails to restore them.
+ */
+#define _ICALL_SAVE_REGS \
+    uint32_t _save_ebx = g_ebx, _save_esi = g_esi, _save_edi = g_edi
+#define _ICALL_RESTORE_REGS \
+    g_ebx = _save_ebx; g_esi = _save_esi; g_edi = _save_edi
+
 #define RECOMP_ICALL(xbox_va) do { \
     uint32_t _va = (uint32_t)(xbox_va); \
     g_icall_trace[g_icall_trace_idx & (ICALL_TRACE_SIZE-1)] = _va; \
@@ -233,7 +254,7 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va);
     recomp_func_t _fn = recomp_lookup_manual(_va); \
     if (!_fn) _fn = recomp_lookup(_va); \
     if (!_fn) _fn = recomp_lookup_kernel(_va); \
-    if (_fn) _fn(); \
+    if (_fn) { _ICALL_SAVE_REGS; _fn(); _ICALL_RESTORE_REGS; } \
     else { g_esp += 4; eax = 0; } /* pop dummy ret addr; zero return value */ \
 } while(0)
 
@@ -250,8 +271,13 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va);
     recomp_func_t _fn = recomp_lookup_manual(_va); \
     if (!_fn) _fn = recomp_lookup(_va); \
     if (!_fn) _fn = recomp_lookup_kernel(_va); \
-    if (_fn) _fn(); \
-    else { g_esp = (saved_esp); eax = 0; } /* restore esp; zero return value */ \
+    if (_fn) { _ICALL_SAVE_REGS; _fn(); _ICALL_RESTORE_REGS; } \
+    else { \
+        fprintf(stderr, "  [ICALL] FAILED lookup: VA=0x%08X in %s (esp restored from 0x%08X to 0x%08X)\n", \
+                _va, __FUNCTION__, g_esp, (saved_esp)); \
+        fflush(stderr); \
+        g_esp = (saved_esp); eax = 0; \
+    } \
 } while(0)
 
 /**

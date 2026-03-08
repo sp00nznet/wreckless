@@ -69,12 +69,20 @@ Based on the xboxrecomp framework and burnout3 reference project.
 - [x] First successful build (3.5MB MSVC x64)
 - [x] First successful boot (10 kernel calls, heap allocation)
 - [x] 6 new kernel functions pushed upstream to xboxrecomp
-- [ ] Debug early init crash (null pointer in data structure setup)
+- [x] CRT heap initialization fixed (free list bin fixup)
+- [x] Callee-saved register guard for indirect calls
+- [x] CRT constructor table fully executed (20+ constructors)
+- [x] Game main (sub_00021100) reached
+- [ ] Fix stack corruption during CRT init (esp misaligned after sub_000EE98D)
+- [ ] Debug game main crash (sub_00021100 → sub_00067B20)
 - [ ] D3D8 translation for Wreckless rendering
 - [ ] Audio/input integration
 
 ## Known Issues
 - ~2000 unresolved sub_ symbols stubbed (disassembler missed function starts)
 - 32 functions failed translation (complex instruction patterns)
-- Crash during early init at Xbox VA 0xFFFFFFF5 (null pointer + negative offset)
+- Stack corruption: CRT init (sub_000EE98D) leaks ~1527 bytes and misaligns esp by 1 byte
+- Misidentified functions in DSOUND section (sub_0012FB19, sub_0012FB24, sub_0012FB2F) — stubbed
+- HeapAlloc defensive fix: bins with Blink=0 are treated as empty (HeapCreate dead-code bug)
+- 431 dead code switch targets cause callee-saved register corruption (guarded via ICALL macros)
 - 57/113 kernel ordinals are stubs (return 0/success without real implementation)

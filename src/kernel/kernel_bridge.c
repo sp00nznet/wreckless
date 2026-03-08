@@ -772,7 +772,12 @@ static const char* bridge_get_xbox_path(uint32_t obj_attrs_va)
     uint32_t ansi_str_va, buf_va;
     if (!obj_attrs_va) return NULL;
     ansi_str_va = BRIDGE_MEM32(obj_attrs_va + 4);
-    if (!ansi_str_va) return NULL;
+    if (!ansi_str_va) {
+        uint32_t root_dir = BRIDGE_MEM32(obj_attrs_va + 0);
+        fprintf(stderr, "  [FILE] get_path: obj_attrs=0x%08X, RootDir=0x%08X, ObjectName=NULL\n",
+                obj_attrs_va, root_dir);
+        return NULL;
+    }
     buf_va = BRIDGE_MEM32(ansi_str_va + 4);
     if (!buf_va) return NULL;
     return (const char*)XBOX_TO_NATIVE(buf_va);
@@ -815,11 +820,13 @@ static NTSTATUS bridge_create_file_impl(
 
     xbox_path = bridge_get_xbox_path(obj_attrs_va);
     if (!xbox_path) {
+        fprintf(stderr, "  [FILE] NtCreateFile: NULL path (obj_attrs=0x%08X)\n", obj_attrs_va);
         bridge_write_iostatus(iostatus_va, STATUS_OBJECT_PATH_NOT_FOUND, 0);
         return STATUS_OBJECT_PATH_NOT_FOUND;
     }
 
     if (!xbox_translate_path(xbox_path, win_path, MAX_PATH)) {
+        fprintf(stderr, "  [FILE] path translation failed: %s\n", xbox_path);
         bridge_write_iostatus(iostatus_va, STATUS_OBJECT_PATH_NOT_FOUND, 0);
         return STATUS_OBJECT_PATH_NOT_FOUND;
     }
@@ -1865,6 +1872,17 @@ static void kernel_thunk_dispatch(void)
 
     if (g_kernel_call_count <= 200) {
         fprintf(stderr, "  [KERNEL] → returned 0x%08X\n", g_eax);
+        /* Monitor CRT heap handle - fix free list bins once */
+        {
+            static int heap_fixed = 0;
+            uint32_t heap_handle = BRIDGE_MEM32(0x1D1A10);
+            if (heap_handle != 0 && !heap_fixed) {
+                fprintf(stderr, "  [KERNEL] *** CRT heap handle changed to 0x%08X ***\n", heap_handle);
+                extern void fixup_heap_freelists(uint32_t heap_handle);
+                fixup_heap_freelists(heap_handle);
+                heap_fixed = 1;
+            }
+        }
         fflush(stderr);
     }
 }

@@ -79,6 +79,23 @@ static LONG CALLBACK veh_handler(PEXCEPTION_POINTERS ep)
             g_ebx, g_esi, g_edi);
         fprintf(stderr, "  Xbox VA of fault: 0x%08X\n",
             (uint32_t)(fault_addr - (uintptr_t)g_xbox_mem_offset));
+        /* Dump CRT heap handle for heap crash diagnosis */
+        {
+            uint32_t heap_handle = *(uint32_t *)((uint8_t *)g_xbox_mem_offset + 0x1D1A10);
+            uint32_t active_heap = *(uint32_t *)((uint8_t *)g_xbox_mem_offset + 0x1D1BAC);
+            fprintf(stderr, "  CRT heap handle (0x1D1A10): 0x%08X\n", heap_handle);
+            fprintf(stderr, "  __active_heap (0x1D1BAC): %u\n", active_heap);
+        }
+        /* Print a few return addresses from the native stack for debugging */
+        {
+            uintptr_t *sp = (uintptr_t *)ep->ContextRecord->Rsp;
+            fprintf(stderr, "  Native stack (first 8 return addrs):\n");
+            for (int i = 0; i < 64 && sp[i]; i++) {
+                if (sp[i] >= 0x140000000ULL && sp[i] < 0x150000000ULL) {
+                    fprintf(stderr, "    [%d] 0x%llX\n", i, (unsigned long long)sp[i]);
+                }
+            }
+        }
         fflush(stderr);
     }
 
@@ -134,12 +151,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     printf("Initializing Xbox kernel replacement...\n");
     xbox_kernel_init();
 
+    /* Step 3b: Set game directory for file I/O */
+    {
+        extern void xbox_path_init(const char* game_dir, const char* save_dir);
+        xbox_path_init("game\\Wreckless - The Yakuza Missions", NULL);
+    }
+
     /* Step 4: Initialize Xbox kernel bridge (thunk table in Xbox memory) */
     printf("Initializing kernel bridge...\n");
     xbox_kernel_bridge_init();
 
     /* Step 5: Initialize stack */
     g_esp = XBOX_STACK_TOP;
+
+    /* Debug: dump key kernel thunk table entries */
+    {
+        uint32_t *thunk_table = (uint32_t *)((uint8_t *)g_xbox_mem_offset + 0x14EF20);
+        printf("  [DEBUG] Thunk table (0x14EF20) after bridge init:\n");
+        for (int i = 0; i < 113; i++) {
+            if (thunk_table[i] != 0) {
+                uint32_t va = 0x14EF20 + i * 4;
+                printf("    [%3d] 0x%06X = 0x%08X\n", i, va, thunk_table[i]);
+            }
+        }
+    }
+
+    /* Pre-initialize CRT globals that would be set by __heap_init */
+    {
+        /* __active_heap: 1=system heap (HeapAlloc), 3=small-block heap */
+        /* Using 1 avoids SBH initialization, using standard Win32 HeapAlloc */
+        uint32_t *active_heap = (uint32_t *)((uint8_t *)g_xbox_mem_offset + 0x1D1BAC);
+        *active_heap = 1;
+        printf("CRT __active_heap set to 1 (system heap mode)\n");
+    }
 
     printf("\n=== Initialization complete ===\n");
     printf("Entry point: 0x%08X\n", WRECKLESS_ENTRY_POINT);
@@ -148,6 +192,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     /* Step 6: Call the recompiled entry point */
     printf("\nStarting game...\n");
     fflush(stdout);
+
+    /* Debug: monitor CRT heap handle initialization */
+    {
+        uint32_t *heap_handle = (uint32_t *)((uint8_t *)g_xbox_mem_offset + 0x1D1A10);
+        printf("  [DEBUG] CRT heap handle (0x1D1A10) before entry: 0x%08X\n", *heap_handle);
+    }
+
     xbe_entry_point();
 
     printf("\nGame returned. Cleaning up...\n");
